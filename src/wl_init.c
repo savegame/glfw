@@ -42,6 +42,7 @@
 
 #include "wayland-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
+#include "surface-extension-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "viewporter-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
@@ -57,6 +58,10 @@
 
 #define types _glfw_wayland_types
 #include "wayland-client-protocol-code.h"
+#undef types
+
+#define type _glfw_surface_extension_types
+#include "surface-extension-client-protocol-code.h"
 #undef types
 
 #define types _glfw_xdg_shell_types
@@ -153,6 +158,16 @@ static void registryHandleGlobal(void* userData,
         _glfw.wl.wmBase =
             wl_registry_bind(registry, name, &xdg_wm_base_interface, 1);
         xdg_wm_base_add_listener(_glfw.wl.wmBase, &wmBaseListener, NULL);
+    }
+    else if (strcmp(interface, "wl_shell") == 0)
+    {
+        _glfw.wl.wlShell =
+            wl_registry_bind(registry, name, &wl_shell_interface, 1);
+    }
+    else if (strcmp(interface, qt_surface_extension_interface.name) == 0)
+    {
+        _glfw.wl.qtSurfaceExtension =
+            wl_registry_bind(registry, name, &qt_surface_extension_interface, 1);
     }
     else if (strcmp(interface, "zxdg_decoration_manager_v1") == 0)
     {
@@ -861,9 +876,18 @@ int _glfwInitWayland(void)
 
     if (!_glfw.wl.wmBase)
     {
+#ifdef _GLFW_AURORAOS
+        if (!_glfw.wl.wlShell || !_glfw.wl.qtSurfaceExtension)
+        {
+            _glfwInputError(GLFW_PLATFORM_ERROR,
+                            "Wayland: Failed to find xdg-shell, qt-surface-extension and wl-shell in your compositor");
+            return GLFW_FALSE;
+        }
+#else
         _glfwInputError(GLFW_PLATFORM_ERROR,
                         "Wayland: Failed to find xdg-shell in your compositor");
         return GLFW_FALSE;
+#endif
     }
 
     if (!_glfw.wl.shm)
@@ -957,6 +981,10 @@ void _glfwTerminateWayland(void)
         zxdg_decoration_manager_v1_destroy(_glfw.wl.decorationManager);
     if (_glfw.wl.wmBase)
         xdg_wm_base_destroy(_glfw.wl.wmBase);
+    if (_glfw.wl.wlShell)
+        wl_shell_destroy(_glfw.wl.wlShell);
+    if (_glfw.wl.qtSurfaceExtension)
+        qt_surface_extension_destroy(_glfw.wl.qtSurfaceExtension);
     if (_glfw.wl.selectionOffer)
         wl_data_offer_destroy(_glfw.wl.selectionOffer);
     if (_glfw.wl.dragOffer)

@@ -40,8 +40,11 @@
 #include <sys/mman.h>
 #include <sys/timerfd.h>
 #include <poll.h>
+#ifdef _GLFW_AURORAOS
+#include <linux/input.h>
+#else
 #include <linux/input-event-codes.h>
-
+#endif 
 #include "wayland-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
@@ -51,6 +54,7 @@
 #include "xdg-activation-v1-client-protocol.h"
 #include "idle-inhibit-unstable-v1-client-protocol.h"
 #include "fractional-scale-v1-client-protocol.h"
+#include "surface-extension-client-protocol.h"
 
 #define GLFW_BORDER_SIZE    4
 #define GLFW_CAPTION_HEIGHT 24
@@ -308,6 +312,7 @@ static void setContentAreaOpaque(_GLFWwindow* window)
 
     wl_region_add(region, 0, 0, window->wl.width, window->wl.height);
     wl_surface_set_opaque_region(window->wl.surface, region);
+    wl_surface_commit(window->wl.surface);
     wl_region_destroy(region);
 }
 
@@ -510,6 +515,13 @@ static void acquireMonitor(_GLFWwindow* window)
         xdg_toplevel_set_fullscreen(window->wl.xdg.toplevel,
                                     window->monitor->wl.output);
     }
+    else if (window->wl.wlshell.surface)
+    {
+        wl_shell_surface_set_fullscreen(window->wl.wlshell.surface, 
+                                        WL_SHELL_SURFACE_FULLSCREEN_METHOD_FILL, 
+                                        0, 
+                                        window->monitor->wl.output);
+    }
 
     setIdleInhibitor(window, GLFW_TRUE);
 
@@ -620,6 +632,116 @@ static const struct xdg_toplevel_listener xdgToplevelListener =
     xdgToplevelHandleClose
 };
 
+static void wlShellSurfacePing(void *data,
+            struct wl_shell_surface *wl_shell_surface,
+            uint32_t serial)
+{
+    wl_shell_surface_pong(wl_shell_surface, serial);
+}
+
+static void wlShellSurfaceConfigure(void *data,
+            struct wl_shell_surface *wl_shell_surface,
+            uint32_t edges,
+            int32_t width,
+            int32_t height)
+{
+    // configure
+    _GLFWwindow* window = data;
+
+    // TODO: 
+    // window->wl.pending.activated  = GLFW_FALSE;
+    // window->wl.pending.maximized  = GLFW_FALSE;
+    // window->wl.pending.fullscreen = GLFW_FALSE;
+
+    if (width && height)
+    {
+        if (window->wl.fallback.decorations)
+        {
+            window->wl.pending.width  = _glfw_max(0, width - GLFW_BORDER_SIZE * 2);
+            window->wl.pending.height =
+                _glfw_max(0, height - GLFW_BORDER_SIZE - GLFW_CAPTION_HEIGHT);
+        }
+        else
+        {
+            window->wl.pending.width  = width;
+            window->wl.pending.height = height;
+        }
+    }
+    else
+    {
+        window->wl.pending.width  = window->wl.width;
+        window->wl.pending.height = window->wl.height;
+    }
+
+    if (resizeWindow(window, window->wl.pending.width, window->wl.pending.height))
+    {
+        _glfwInputWindowSize(window, window->wl.width, window->wl.height);
+
+        if (window->wl.visible)
+            _glfwInputWindowDamage(window);
+    }
+
+    if (!window->wl.visible)
+    {
+        window->wl.visible = GLFW_TRUE;
+        _glfwInputWindowDamage(window);
+    }
+}
+
+static void wlShellSurfacePopupDone(void *data,
+            struct wl_shell_surface *wl_shell_surface)
+{
+    // popup done
+}
+
+static const struct wl_shell_surface_listener wlShellSurfaceListener = 
+{
+    wlShellSurfacePing,
+    wlShellSurfaceConfigure,
+    wlShellSurfacePopupDone
+};
+
+void qtExtendedSurfaceOnScreenVisibility(void *data,
+                            struct qt_extended_surface *qt_extended_surface,
+                            int32_t visible)
+{
+    _GLFWwindow* w = (_GLFWwindow*)data;
+    switch(visible)
+    {
+    case 2: //
+    case 5: //fullscreen
+        w->wl.visible = GLFW_TRUE;
+        w->wl.maximized = GLFW_TRUE;
+        break;
+    case 3: //in pause
+        w->wl.visible = GLFW_FALSE;
+        w->wl.maximized = GLFW_FALSE;
+        break;
+    }
+}
+
+void qtExtendedSurfaceSetGenericProperty(void *data,
+                            struct qt_extended_surface *qt_extended_surface,
+                            const char *name,
+                            struct wl_array *value)
+{
+    _GLFWwindow* window = data;
+}
+
+void qtExtendedSurfaceClose(void *data,
+              struct qt_extended_surface *qt_extended_surface)
+{
+    _GLFWwindow* window = data;
+    _glfwInputWindowCloseRequest(window);
+}
+
+static const struct qt_extended_surface_listener qtExtendedSurfaceListener =
+{
+    qtExtendedSurfaceOnScreenVisibility,
+    qtExtendedSurfaceSetGenericProperty,
+    qtExtendedSurfaceClose
+};
+
 static void xdgSurfaceHandleConfigure(void* userData,
                                       struct xdg_surface* surface,
                                       uint32_t serial)
@@ -634,7 +756,10 @@ static void xdgSurfaceHandleConfigure(void* userData,
         if (!window->wl.activated)
         {
             if (window->monitor && window->autoIconify)
-                xdg_toplevel_set_minimized(window->wl.xdg.toplevel);
+            {
+                if (window->wl.xdg.toplevel)
+                    xdg_toplevel_set_minimized(window->wl.xdg.toplevel);
+            }
         }
     }
 
@@ -984,6 +1109,63 @@ static GLFWbool createXdgShellObjects(_GLFWwindow* window)
     return GLFW_TRUE;
 }
 
+static GLFWbool createWlShellObjects(_GLFWwindow* window)
+{
+    if (window->wl.wlshell.surface)
+        return GLFW_TRUE;
+
+    window->wl.wlshell.surface = wl_shell_get_shell_surface(_glfw.wl.wlShell, window->wl.surface);
+
+    if (!window->wl.wlshell.surface)
+    {
+        _glfwInputError(GLFW_PLATFORM_ERROR,
+                        "Wayland: Failed to create wl-shell-surface for window");
+        return GLFW_FALSE;
+    }
+
+    wl_shell_surface_add_listener(window->wl.wlshell.surface, &wlShellSurfaceListener, window);
+
+    if (window->title)
+    {
+        wl_shell_surface_set_title(window->wl.wlshell.surface, window->title);
+    }
+
+    
+    if (window->wl.maximized)
+    {
+        wl_shell_surface_set_maximized(window->wl.wlshell.surface, NULL);
+        setIdleInhibitor(window, GLFW_FALSE);
+    }
+    else
+    {
+        wl_shell_surface_set_toplevel(window->wl.wlshell.surface);
+        setIdleInhibitor(window, GLFW_FALSE);
+    }
+
+    wl_surface_commit(window->wl.surface);
+    wl_display_roundtrip(_glfw.wl.display);
+
+    if (!window->wl.visible)
+    {
+        window->wl.visible = GLFW_TRUE;
+        _glfwInputWindowDamage(window);
+    }
+
+    return GLFW_TRUE;
+}
+
+static void destroyWlShellObjects(_GLFWwindow* window)
+{
+    if (window->wl.wlshell.surface)
+        wl_shell_surface_destroy(window->wl.wlshell.surface);
+
+    if (window->wl.wlshell.qtExtendedSurface)
+        qt_extended_surface_destroy(window->wl.wlshell.qtExtendedSurface);
+
+    window->wl.wlshell.surface = NULL;
+    window->wl.wlshell.qtExtendedSurface = NULL;
+}
+
 static GLFWbool createShellObjects(_GLFWwindow* window)
 {
     if (_glfw.wl.libdecor.context)
@@ -992,12 +1174,17 @@ static GLFWbool createShellObjects(_GLFWwindow* window)
             return GLFW_TRUE;
     }
 
-    return createXdgShellObjects(window);
+    if (_glfw.wl.wmBase)
+        return createXdgShellObjects(window);
+    else if (_glfw.wl.wlShell)
+        return createWlShellObjects(window);
+    return GLFW_FALSE;
 }
 
 static void destroyShellObjects(_GLFWwindow* window)
 {
     destroyFallbackDecorations(window);
+    destroyWlShellObjects(window);
 
     if (window->wl.libdecor.frame)
         libdecor_frame_unref(window->wl.libdecor.frame);
@@ -1033,6 +1220,21 @@ static GLFWbool createNativeSurface(_GLFWwindow* window,
     wl_surface_add_listener(window->wl.surface,
                             &surfaceListener,
                             window);
+
+    if (_glfw.wl.qtSurfaceExtension)
+    {
+        window->wl.wlshell.qtExtendedSurface = qt_surface_extension_get_extended_surface(_glfw.wl.qtSurfaceExtension, window->wl.surface);
+
+        if (!window->wl.wlshell.qtExtendedSurface)
+        {
+            _glfwInputError(GLFW_PLATFORM_ERROR,
+                            "Wayland: Failed to create qt-extended-surface for window");
+            return GLFW_FALSE;
+        }
+
+        qt_extended_surface_add_listener(window->wl.wlshell.qtExtendedSurface, &qtExtendedSurfaceListener, window);
+    }
+
 
     window->wl.width = wndconfig->width;
     window->wl.height = wndconfig->height;
@@ -1559,7 +1761,7 @@ static void pointerHandleButton(void* userData,
             {
                 if (window->wl.cursorPosY < GLFW_BORDER_SIZE)
                     edges = XDG_TOPLEVEL_RESIZE_EDGE_TOP;
-                else
+                else if (window->wl.xdg.toplevel)
                     xdg_toplevel_move(window->wl.xdg.toplevel, _glfw.wl.seat, serial);
             }
             else if (window->wl.fallback.focus == window->wl.fallback.left.surface)
@@ -1586,7 +1788,7 @@ static void pointerHandleButton(void* userData,
                     edges = XDG_TOPLEVEL_RESIZE_EDGE_BOTTOM;
             }
 
-            if (edges != XDG_TOPLEVEL_RESIZE_EDGE_NONE)
+            if (edges != XDG_TOPLEVEL_RESIZE_EDGE_NONE && window->wl.xdg.toplevel)
             {
                 xdg_toplevel_resize(window->wl.xdg.toplevel, _glfw.wl.seat,
                                     serial, edges);
@@ -2416,13 +2618,15 @@ void _glfwMaximizeWindowWayland(_GLFWwindow* window)
         libdecor_frame_set_maximized(window->wl.libdecor.frame);
     else if (window->wl.xdg.toplevel)
         xdg_toplevel_set_maximized(window->wl.xdg.toplevel);
+    else if (window->wl.wlshell.surface)
+        wl_shell_surface_set_maximized(window->wl.wlshell.surface, NULL);
     else
         window->wl.maximized = GLFW_TRUE;
 }
 
 void _glfwShowWindowWayland(_GLFWwindow* window)
 {
-    if (!window->wl.libdecor.frame && !window->wl.xdg.toplevel)
+    if (!window->wl.libdecor.frame && !window->wl.xdg.toplevel && !window->wl.wlshell.surface)
     {
         // NOTE: The XDG surface and role are created here so command-line applications
         //       with off-screen windows do not appear in for example the Unity dock

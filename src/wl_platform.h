@@ -381,6 +381,11 @@ typedef struct _GLFWwindowWayland
     } xdg;
 
     struct {
+        struct wl_shell_surface* surface;
+        struct qt_extended_surface* qtExtendedSurface;
+    } wlshell;
+
+    struct {
         struct libdecor_frame*  frame;
     } libdecor;
 
@@ -430,6 +435,8 @@ typedef struct _GLFWlibraryWayland
     struct wl_data_device_manager*          dataDeviceManager;
     struct wl_data_device*      dataDevice;
     struct xdg_wm_base*         wmBase;
+    struct wl_shell*            wlShell;
+    struct qt_surface_extension*            qtSurfaceExtension;
     struct zxdg_decoration_manager_v1*      decorationManager;
     struct wp_viewporter*       viewporter;
     struct zwp_relative_pointer_manager_v1* relativePointerManager;

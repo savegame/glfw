@@ -56,6 +56,10 @@ if (GLFW_BUILD_WAYLAND)
                                 wl_monitor.c wl_window.c xkb_unicode.c)
 endif()
 
+if (GLFW_AURORAOS)
+    target_compile_definitions(glfw PUBLIC _GLFW_AURORAOS)
+endif()
+
 if (GLFW_BUILD_X11 OR GLFW_BUILD_WAYLAND)
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_sources(glfw PRIVATE linux_joystick.h linux_joystick.c)
@@ -104,6 +108,7 @@ if (GLFW_BUILD_WAYLAND)
     generate_wayland_protocol("fractional-scale-v1.xml")
     generate_wayland_protocol("xdg-activation-v1.xml")
     generate_wayland_protocol("xdg-decoration-unstable-v1.xml")
+    generate_wayland_protocol("surface-extension.xml")
 endif()
 
 if (WIN32 AND GLFW_BUILD_SHARED_LIBRARY)
