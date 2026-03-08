@@ -2028,6 +2028,24 @@ typedef void (* GLFWmonitorfun)(GLFWmonitor* monitor, int event);
  */
 typedef void (* GLFWjoystickfun)(int jid, int event);
 
+/*! @brief The function pointer type for touch callbacks.
+ *
+ *  This is the function pointer type for touch callbacks.
+ *
+ *  @param[in] window The window that received the event.
+ *  @param[in] touch The touch point index.
+ *  @param[in] action `GLFW_PRESS`, `GLFW_RELEASE`, or `GLFW_REPEAT`
+ *  @param[in] x The x-coordinate of the touch point.
+ *  @param[in] y The y-coordinate of the touch point.
+ *
+ *  @sa @ref glfwSetTouchCallback
+ *
+ *  @since Added in version 3.4-aurora
+ *
+ *  @ingroup input
+ */
+typedef void (* GLFWtouchfun)(GLFWwindow* window, int touch, int action, double x, double y);
+
 /*! @brief Video mode type.
  *
  *  This describes a single video mode.
@@ -5496,6 +5514,34 @@ GLFWAPI GLFWscrollfun glfwSetScrollCallback(GLFWwindow* window, GLFWscrollfun ca
  *  @ingroup input
  */
 GLFWAPI GLFWdropfun glfwSetDropCallback(GLFWwindow* window, GLFWdropfun callback);
+
+/*! @brief Sets the touch callback.
+ *
+ *  This function sets the touch callback of the specified window, which is
+ *  called when a touch input event occurs.
+ *
+ *  @param[in] window The window whose callback to set.
+ *  @param[in] callback The new callback, or `NULL` to remove the currently set
+ *  callback.
+ *  @return The previously set callback, or `NULL` if no callback was set or the
+ *  library had not been [initialized](@ref intro_init).
+ *
+ *  @callback_signature
+ *  @code
+ *  void function_name(GLFWwindow* window, int touch, int action, double x, double y)
+ *  @endcode
+ *  For more information about the callback parameters, see the
+ *  [function pointer type](@ref GLFWtouchfun).
+ *
+ *  @errors Possible errors include @ref GLFW_NOT_INITIALIZED.
+ *
+ *  @thread_safety This function must only be called from the main thread.
+ *
+ *  @since Added in version 3.4.
+ *
+ *  @ingroup input
+ */
+GLFWAPI GLFWtouchfun glfwSetTouchCallback(GLFWwindow* window, GLFWtouchfun callback);
 
 /*! @brief Returns whether the specified joystick is present.
  *

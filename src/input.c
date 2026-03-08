@@ -477,6 +477,15 @@ void _glfwInputJoystickHat(_GLFWjoystick* js, int hat, char value)
 }
 
 
+void _glfwInputTouch(_GLFWwindow* window, int touch, int action, double x, double y)
+{
+    assert(window != NULL);
+
+    if (window->callbacks.touch)
+        window->callbacks.touch((GLFWwindow*) window, touch, action, x, y);
+}
+
+
 //////////////////////////////////////////////////////////////////////////
 //////                       GLFW internal API                      //////
 //////////////////////////////////////////////////////////////////////////
@@ -1024,6 +1033,16 @@ GLFWAPI GLFWdropfun glfwSetDropCallback(GLFWwindow* handle, GLFWdropfun cbfun)
 
     _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
     _GLFW_SWAP(GLFWdropfun, window->callbacks.drop, cbfun);
+    return cbfun;
+}
+
+GLFWAPI GLFWtouchfun glfwSetTouchCallback(GLFWwindow* handle, GLFWtouchfun cbfun)
+{
+    _GLFWwindow* window = (_GLFWwindow*) handle;
+    assert(window != NULL);
+
+    _GLFW_REQUIRE_INIT_OR_RETURN(NULL);
+    _GLFW_SWAP(GLFWtouchfun, window->callbacks.touch, cbfun);
     return cbfun;
 }
 

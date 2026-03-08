@@ -2079,6 +2079,189 @@ static const struct wl_keyboard_listener keyboardListener =
     keyboardHandleRepeatInfo,
 };
 
+static _GLFWtouchPointWayland* getTouchPoint(int32_t id)
+{
+    for (int i = 0; i < GLFW_WL_TOUCH_MAX; i++)
+    {
+        if (_glfw.wl.touchPoints[i].active && _glfw.wl.touchPoints[i].id == id)
+            return &_glfw.wl.touchPoints[i];
+    }
+    return NULL;
+}
+
+static int getTouchIndex(int32_t id)
+{
+    for (int i = 0; i < GLFW_WL_TOUCH_MAX; i++)
+    {
+        if (_glfw.wl.touchPoints[i].active && _glfw.wl.touchPoints[i].id == id)
+            return i;
+    }
+    return -1;
+}
+
+static int allocTouchPoint(int32_t id, _GLFWwindow* window, double x, double y)
+{
+    for (int i = 0; i < GLFW_WL_TOUCH_MAX; i++)
+    {
+        if (!_glfw.wl.touchPoints[i].active)
+        {
+            _GLFWtouchPointWayland* tp = &_glfw.wl.touchPoints[i];
+            tp->active = GLFW_TRUE;
+            tp->id = id;
+            tp->window = window;
+            tp->x = x;
+            tp->y = y;
+            tp->hasBufferedMotion = GLFW_FALSE;
+            return i;
+        }
+    }
+    return -1;
+}
+
+static void freeTouchPoint(int index)
+{
+    _glfw.wl.touchPoints[index].active = GLFW_FALSE;
+    _glfw.wl.touchPoints[index].window = NULL;
+    _glfw.wl.touchPoints[index].hasBufferedMotion = GLFW_FALSE;
+}
+
+static _GLFWwindow* getWindowFromSurface(struct wl_surface* surface)
+{
+    _GLFWwindow* window;
+    for (window = _glfw.windowListHead; window; window = window->next)
+    {
+        if (window->wl.surface == surface)
+            return window;
+    }
+    return NULL;
+}
+
+// Отправить буферизованные motion события (вызывается из frame)
+static void flushBufferedMotion(void)
+{
+    for (int i = 0; i < GLFW_WL_TOUCH_MAX; i++)
+    {
+        _GLFWtouchPointWayland* tp = &_glfw.wl.touchPoints[i];
+        if (tp->active && tp->hasBufferedMotion)
+        {
+            _glfwInputTouch(tp->window, i, GLFW_REPEAT, tp->x, tp->y);
+            tp->hasBufferedMotion = GLFW_FALSE;
+        }
+    }
+}
+
+static void touchHandleDown(void* userData,
+                            struct wl_touch* touch,
+                            uint32_t serial,
+                            uint32_t time,
+                            struct wl_surface* surface,
+                            int32_t id,
+                            wl_fixed_t sx,
+                            wl_fixed_t sy)
+{
+    _GLFWwindow* window = getWindowFromSurface(surface);
+    if (!window)
+        return;
+
+    _glfw.wl.serial = serial;
+
+    double x = wl_fixed_to_double(sx);
+    double y = wl_fixed_to_double(sy);
+
+    int index = allocTouchPoint(id, window, x, y);
+    if (index < 0)
+        return;
+
+    _glfwInputTouch(window, index, GLFW_PRESS, x, y);
+}
+
+static void touchHandleUp(void* userData,
+                          struct wl_touch* touch,
+                          uint32_t serial,
+                          uint32_t time,
+                          int32_t id)
+{
+    _glfw.wl.serial = serial;
+
+    int index = getTouchIndex(id);
+    if (index < 0)
+        return;
+
+    _GLFWtouchPointWayland* tp = &_glfw.wl.touchPoints[index];
+    _GLFWwindow* window = tp->window;
+    double x = tp->x;
+    double y = tp->y;
+
+    // Has motion buffer — flush before release
+    if (tp->hasBufferedMotion)
+    {
+        _glfwInputTouch(window, index, GLFW_REPEAT, x, y);
+        tp->hasBufferedMotion = GLFW_FALSE;
+    }
+
+    _glfwInputTouch(window, index, GLFW_RELEASE, x, y);
+
+    freeTouchPoint(index);
+}
+
+static void touchHandleMotion(void* userData,
+                              struct wl_touch* touch,
+                              uint32_t time,
+                              int32_t id,
+                              wl_fixed_t sx,
+                              wl_fixed_t sy)
+{
+    _GLFWtouchPointWayland* tp = getTouchPoint(id);
+    if (!tp)
+        return;
+
+    double x = wl_fixed_to_double(sx);
+    double y = wl_fixed_to_double(sy);
+
+    tp->x = x;
+    tp->y = y;
+
+    // check wl_touch verion, to buffer touch before frame
+    if (_glfw.wl.touchVersion >= 3)
+    {
+        tp->hasBufferedMotion = GLFW_TRUE;
+    }
+    else // or send it immediately
+    {
+        _glfwInputTouch(tp->window, getTouchIndex(id), GLFW_REPEAT, x, y);
+    }
+}
+
+static void touchHandleFrame(void* userData,
+                             struct wl_touch* touch)
+{
+    flushBufferedMotion();
+}
+
+static void touchHandleCancel(void* userData,
+                              struct wl_touch* touch)
+{
+    // Cancel all active touches
+    for (int i = 0; i < GLFW_WL_TOUCH_MAX; i++)
+    {
+        _GLFWtouchPointWayland* tp = &_glfw.wl.touchPoints[i];
+        if (tp->active)
+        {
+            _glfwInputTouch(tp->window, i, GLFW_RELEASE, tp->x, tp->y);
+            freeTouchPoint(i);
+        }
+    }
+}
+
+static const struct wl_touch_listener touchListener =
+{
+    touchHandleDown,
+    touchHandleUp,
+    touchHandleMotion,
+    touchHandleFrame,
+    touchHandleCancel,
+};
+
 static void seatHandleCapabilities(void* userData,
                                    struct wl_seat* seat,
                                    enum wl_seat_capability caps)
@@ -2103,6 +2286,26 @@ static void seatHandleCapabilities(void* userData,
     {
         wl_keyboard_destroy(_glfw.wl.keyboard);
         _glfw.wl.keyboard = NULL;
+    }
+
+    if ((caps & WL_SEAT_CAPABILITY_TOUCH) && !_glfw.wl.touch)
+    {
+        _glfw.wl.touch = wl_seat_get_touch(seat);
+        _glfw.wl.touchVersion = wl_touch_get_version(_glfw.wl.touch);
+        
+        // Initialize touch points
+        for (int i = 0; i < GLFW_WL_TOUCH_MAX; i++)
+        {
+            _glfw.wl.touchPoints[i].active = GLFW_FALSE;
+        }
+        
+        wl_touch_add_listener(_glfw.wl.touch, &touchListener, NULL);
+    }
+    else if (!(caps & WL_SEAT_CAPABILITY_TOUCH) && _glfw.wl.touch)
+    {
+        wl_touch_destroy(_glfw.wl.touch);
+        _glfw.wl.touch = NULL;
+        _glfw.wl.touchVersion = 0;
     }
 }
 

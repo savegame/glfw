@@ -139,6 +139,8 @@ struct wl_output;
 #define GLFW_WAYLAND_MONITOR_STATE        _GLFWmonitorWayland wl;
 #define GLFW_WAYLAND_CURSOR_STATE         _GLFWcursorWayland  wl;
 
+#define GLFW_WL_TOUCH_MAX 20
+
 struct wl_cursor_image {
     uint32_t width;
     uint32_t height;
@@ -345,6 +347,15 @@ typedef struct _GLFWscaleWayland
     int32_t                     factor;
 } _GLFWscaleWayland;
 
+typedef struct _GLFWtouchPointWayland {
+    _GLFWwindow* window;
+    GLFWbool    active;
+    int32_t     id;
+    double      x;
+    double      y;
+    GLFWbool    hasBufferedMotion;
+} _GLFWtouchPointWayland;
+
 // Wayland-specific per-window data
 //
 typedef struct _GLFWwindowWayland
@@ -433,6 +444,8 @@ typedef struct _GLFWlibraryWayland
     struct wl_seat*             seat;
     struct wl_pointer*          pointer;
     struct wl_keyboard*         keyboard;
+    struct wl_touch*            touch;
+    uint32_t                    touchVersion;
     struct wl_data_device_manager*          dataDeviceManager;
     struct wl_data_device*      dataDevice;
     struct xdg_wm_base*         wmBase;
@@ -446,6 +459,7 @@ typedef struct _GLFWlibraryWayland
     struct xdg_activation_v1*               activationManager;
     struct wp_fractional_scale_manager_v1*  fractionalScaleManager;
 
+    _GLFWtouchPointWayland      touchPoints[GLFW_WL_TOUCH_MAX];
     _GLFWofferWayland*          offers;
     unsigned int                offerCount;
 
