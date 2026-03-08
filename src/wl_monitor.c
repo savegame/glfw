@@ -57,6 +57,22 @@ static void outputHandleGeometry(void* userData,
 
     if (strlen(monitor->name) == 0)
         snprintf(monitor->name, sizeof(monitor->name), "%s %s", make, model);
+
+    /* Check if transform changed */
+    if (monitor->wl.transform != transform)
+    {
+        monitor->wl.transform = transform;
+        
+        /* Notify if monitor is already registered */
+        for (int i = 0; i < _glfw.monitorCount; i++)
+        {
+            if (_glfw.monitors[i] == monitor)
+            {
+                _glfwInputMonitor(monitor, GLFW_TRANSFORM_CHANGED, _GLFW_INSERT_LAST);
+                break;
+            }
+        }
+    }
 }
 
 static void outputHandleMode(void* userData,
@@ -210,6 +226,11 @@ void _glfwGetMonitorContentScaleWayland(_GLFWmonitor* monitor,
         *xscale = (float) monitor->wl.scale;
     if (yscale)
         *yscale = (float) monitor->wl.scale;
+}
+
+int _glfwGetMonitorTransformWayland(_GLFWmonitor* monitor)
+{
+    return monitor->wl.transform;
 }
 
 void _glfwGetMonitorWorkareaWayland(_GLFWmonitor* monitor,

@@ -616,6 +616,7 @@ typedef struct _GLFWmonitorWayland
     int                         x;
     int                         y;
     int32_t                     scale;
+    int32_t                     transform;
 } _GLFWmonitorWayland;
 
 // Wayland-specific per-cursor data
@@ -700,6 +701,7 @@ VkResult _glfwCreateWindowSurfaceWayland(VkInstance instance, _GLFWwindow* windo
 void _glfwFreeMonitorWayland(_GLFWmonitor* monitor);
 void _glfwGetMonitorPosWayland(_GLFWmonitor* monitor, int* xpos, int* ypos);
 void _glfwGetMonitorContentScaleWayland(_GLFWmonitor* monitor, float* xscale, float* yscale);
+int _glfwGetMonitorTransformWayland(_GLFWmonitor* monitor);
 void _glfwGetMonitorWorkareaWayland(_GLFWmonitor* monitor, int* xpos, int* ypos, int* width, int* height);
 GLFWvidmode* _glfwGetVideoModesWayland(_GLFWmonitor* monitor, int* count);
 GLFWbool _glfwGetVideoModeWayland(_GLFWmonitor* monitor, GLFWvidmode* mode);

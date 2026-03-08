@@ -95,7 +95,7 @@ static GLFWbool refreshVideoModes(_GLFWmonitor* monitor)
 void _glfwInputMonitor(_GLFWmonitor* monitor, int action, int placement)
 {
     assert(monitor != NULL);
-    assert(action == GLFW_CONNECTED || action == GLFW_DISCONNECTED);
+    assert(action == GLFW_CONNECTED || action == GLFW_DISCONNECTED || action == GLFW_TRANSFORM_CHANGED);
     assert(placement == _GLFW_INSERT_FIRST || placement == _GLFW_INSERT_LAST);
 
     if (action == GLFW_CONNECTED)
@@ -390,6 +390,21 @@ GLFWAPI void glfwGetMonitorContentScale(GLFWmonitor* handle,
 
     _GLFW_REQUIRE_INIT();
     _glfw.platform.getMonitorContentScale(monitor, xscale, yscale);
+}
+
+GLFWAPI int glfwGetMonitorTransform(GLFWmonitor* handle)
+{
+    _GLFWmonitor* monitor = (_GLFWmonitor*) handle;
+    assert(monitor != NULL);
+
+    _GLFW_REQUIRE_INIT_OR_RETURN(-1);
+    
+#if defined(_GLFW_WAYLAND)
+    return _glfwGetMonitorTransformWayland(monitor);
+#else
+    /* Other platforms: no rotation support, return normal */
+    return GLFW_TRANSFORM_NORMAL;
+#endif
 }
 
 GLFWAPI const char* glfwGetMonitorName(GLFWmonitor* handle)

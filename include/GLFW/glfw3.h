@@ -1289,6 +1289,7 @@ extern "C" {
 
 #define GLFW_CONNECTED              0x00040001
 #define GLFW_DISCONNECTED           0x00040002
+#define GLFW_TRANSFORM_CHANGED      0x00040003 // When display orientation changed
 
 /*! @addtogroup init
  *  @{ */
@@ -2761,6 +2762,26 @@ GLFWAPI void glfwGetMonitorPhysicalSize(GLFWmonitor* monitor, int* widthMM, int*
  *  @ingroup monitor
  */
 GLFWAPI void glfwGetMonitorContentScale(GLFWmonitor* monitor, float* xscale, float* yscale);
+
+/*! @brief Returns the transform of the specified monitor.
+ *
+ *  This function returns the current transform (rotation) of the specified
+ *  monitor. The transform indicates how the monitor content is rotated
+ *  relative to its natural orientation.
+ *
+ *  @param[in] monitor The monitor to query.
+ *  @return The transform value (GLFW_TRANSFORM_*), or -1 if an error occurred.
+ *
+ *  @errors Possible errors include @ref GLFW_NOT_INITIALIZED and @ref
+ *  GLFW_PLATFORM_ERROR.
+ *
+ *  @thread_safety This function must only be called from the main thread.
+ *
+ *  @since Added in version 3.4.
+ *
+ *  @ingroup monitor
+ */
+GLFWAPI int glfwGetMonitorTransform(GLFWmonitor* monitor);
 
 /*! @brief Returns the name of the specified monitor.
  *
