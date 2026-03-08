@@ -1341,6 +1341,24 @@ extern "C" {
 #define GLFW_PLATFORM_WAYLAND       0x00060003
 #define GLFW_PLATFORM_X11           0x00060004
 #define GLFW_PLATFORM_NULL          0x00060005
+
+/*! @} */
+/*! @defgroup transform Buffer transform values
+ *  @brief Buffer transform values for content rotation.
+ *
+ *  Buffer transform values for @ref glfwSetWindowContentTransform.
+ *  These match the wl_output_transform enum from Wayland protocol.
+ *
+ *  @ingroup window
+ *  @{ */
+#define GLFW_TRANSFORM_NORMAL           0
+#define GLFW_TRANSFORM_90               1
+#define GLFW_TRANSFORM_180              2
+#define GLFW_TRANSFORM_270              3
+#define GLFW_TRANSFORM_FLIPPED          4
+#define GLFW_TRANSFORM_FLIPPED_90       5
+#define GLFW_TRANSFORM_FLIPPED_180      6
+#define GLFW_TRANSFORM_FLIPPED_270      7
 /*! @} */
 
 #define GLFW_DONT_CARE              -1
@@ -3758,6 +3776,34 @@ GLFWAPI void glfwGetWindowContentScale(GLFWwindow* window, float* xscale, float*
  *  @ingroup window
  */
 GLFWAPI float glfwGetWindowOpacity(GLFWwindow* window);
+
+/*! @brief Sets the buffer transform for the specified window.
+ *
+ *  This function sets the buffer transform of the specified window, which
+ *  describes the rotation and/or reflection of the window content. This
+ *  informs the compositor about content orientation for proper gesture
+ *  handling and status bar positioning on AuroraOS
+ *
+ *  @param[in] window The window whose buffer transform to set.
+ *  @param[in] transform One of `GLFW_TRANSFORM_NORMAL`, `GLFW_TRANSFORM_90`,
+ *  `GLFW_TRANSFORM_180`, `GLFW_TRANSFORM_270`, `GLFW_TRANSFORM_FLIPPED`,
+ *  `GLFW_TRANSFORM_FLIPPED_90`, `GLFW_TRANSFORM_FLIPPED_180`, or
+ *  `GLFW_TRANSFORM_FLIPPED_270`.
+ *
+ *  @errors Possible errors include @ref GLFW_NOT_INITIALIZED and @ref
+ *  GLFW_INVALID_ENUM.
+ *
+ *  @remark @wayland This function uses wl_surface_set_buffer_transform.
+ *
+ *  @remark @x11 @win32 This function does nothing on these platforms.
+ *
+ *  @thread_safety This function must only be called from the main thread.
+ *
+ *  @since Added in version 3.4.
+ *
+ *  @ingroup window
+ */
+GLFWAPI void glfwSetWindowContentTransform(GLFWwindow* window, int transform);
 
 /*! @brief Sets the opacity of the whole window.
  *

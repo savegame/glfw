@@ -397,6 +397,7 @@ typedef struct _GLFWwindowWayland
     // We need to track the monitors the window spans on to calculate the
     // optimal scaling factor.
     int32_t                     bufferScale;
+    int32_t                     bufferTransform;
     _GLFWscaleWayland*          outputScales;
     size_t                      outputScaleCount;
     size_t                      outputScaleSize;
@@ -651,6 +652,7 @@ void _glfwSetWindowDecoratedWayland(_GLFWwindow* window, GLFWbool enabled);
 void _glfwSetWindowFloatingWayland(_GLFWwindow* window, GLFWbool enabled);
 float _glfwGetWindowOpacityWayland(_GLFWwindow* window);
 void _glfwSetWindowOpacityWayland(_GLFWwindow* window, float opacity);
+void _glfwSetWindowContentTransformWayland(_GLFWwindow* window, int transform);
 void _glfwSetWindowMousePassthroughWayland(_GLFWwindow* window, GLFWbool enabled);
 
 void _glfwSetRawMouseMotionWayland(_GLFWwindow* window, GLFWbool enabled);

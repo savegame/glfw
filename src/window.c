@@ -782,6 +782,30 @@ GLFWAPI void glfwSetWindowOpacity(GLFWwindow* handle, float opacity)
     _glfw.platform.setWindowOpacity(window, opacity);
 }
 
+GLFWAPI void glfwSetWindowContentTransform(GLFWwindow* handle, int transform)
+{
+    _GLFWwindow* window = (_GLFWwindow*) handle;
+    assert(window != NULL);
+
+    _GLFW_REQUIRE_INIT();
+
+    if (transform < GLFW_TRANSFORM_NORMAL || transform > GLFW_TRANSFORM_FLIPPED_270)
+    {
+        _glfwInputError(GLFW_INVALID_ENUM,
+                        "Invalid buffer transform 0x%08X",
+                        transform);
+        return;
+    }
+
+#if defined(_GLFW_WAYLAND)
+    if (_glfw.platform.platformID == GLFW_PLATFORM_WAYLAND)
+    {
+        _glfwSetWindowContentTransformWayland(window, transform);
+    }
+#endif
+    // On other platforms (X11, Win32) this is a no-op
+}
+
 GLFWAPI void glfwIconifyWindow(GLFWwindow* handle)
 {
     _GLFWwindow* window = (_GLFWwindow*) handle;

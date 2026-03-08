@@ -2823,6 +2823,26 @@ float _glfwGetWindowOpacityWayland(_GLFWwindow* window)
     return 1.f;
 }
 
+void _glfwSetWindowContentTransformWayland(_GLFWwindow* window, int transform)
+{
+    if (transform < GLFW_TRANSFORM_NORMAL || transform > GLFW_TRANSFORM_FLIPPED_270)
+    {
+        _glfwInputError(GLFW_INVALID_ENUM, "Invalid buffer transform value");
+        return;
+    }
+
+    if (window->wl.bufferTransform == transform)
+        return;
+
+    window->wl.bufferTransform = transform;
+    
+    if (window->wl.surface)
+    {
+        wl_surface_set_buffer_transform(window->wl.surface, transform);
+        wl_surface_commit(window->wl.surface);
+    }
+}
+
 void _glfwSetWindowOpacityWayland(_GLFWwindow* window, float opacity)
 {
     _glfwInputError(GLFW_FEATURE_UNAVAILABLE,

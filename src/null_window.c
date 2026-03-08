@@ -417,6 +417,11 @@ void _glfwSetWindowOpacityNull(_GLFWwindow* window, float opacity)
     window->null.opacity = opacity;
 }
 
+void _glfwSetWindowContentTransformNull(_GLFWwindow* window, int transform)
+{
+    // No-op for null platform
+}
+
 void _glfwSetRawMouseMotionNull(_GLFWwindow *window, GLFWbool enabled)
 {
 }
