@@ -3347,28 +3347,33 @@ static void lockPointer(_GLFWwindow* window)
     if (!_glfw.wl.relativePointerManager)
     {
         _glfwInputError(GLFW_FEATURE_UNAVAILABLE,
-                        "Wayland: The compositor does not support pointer locking");
-        return;
+                        "Wayland: The compositor does not zwp_relative_pointer_manager_v1");
+    } else  {
+        window->wl.relativePointer =
+            zwp_relative_pointer_manager_v1_get_relative_pointer(
+                _glfw.wl.relativePointerManager,
+                _glfw.wl.pointer);
+        zwp_relative_pointer_v1_add_listener(window->wl.relativePointer,
+                                            &relativePointerListener,
+                                            window);
     }
 
-    window->wl.relativePointer =
-        zwp_relative_pointer_manager_v1_get_relative_pointer(
-            _glfw.wl.relativePointerManager,
-            _glfw.wl.pointer);
-    zwp_relative_pointer_v1_add_listener(window->wl.relativePointer,
-                                         &relativePointerListener,
-                                         window);
-
-    window->wl.lockedPointer =
-        zwp_pointer_constraints_v1_lock_pointer(
-            _glfw.wl.pointerConstraints,
-            window->wl.surface,
-            _glfw.wl.pointer,
-            NULL,
-            ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-    zwp_locked_pointer_v1_add_listener(window->wl.lockedPointer,
-                                       &lockedPointerListener,
-                                       window);
+    if (!_glfw.wl.pointerConstraints)
+    {
+        _glfwInputError(GLFW_FEATURE_UNAVAILABLE,
+                        "Wayland: The compositor does not support zwp_pointer_constraints_v1");
+    } else  {
+        window->wl.lockedPointer =
+                zwp_pointer_constraints_v1_lock_pointer(
+                    _glfw.wl.pointerConstraints,
+                    window->wl.surface,
+                    _glfw.wl.pointer,
+                    NULL,
+                    ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+            zwp_locked_pointer_v1_add_listener(window->wl.lockedPointer,
+                                            &lockedPointerListener,
+                                        window);
+    }
 }
 
 static void unlockPointer(_GLFWwindow* window)
