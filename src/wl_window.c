@@ -706,18 +706,25 @@ void qtExtendedSurfaceOnScreenVisibility(void *data,
                             int32_t visible)
 {
     _GLFWwindow* w = (_GLFWwindow*)data;
+    GLFWbool wasIconified = !w->wl.visible;
+
     switch(visible)
     {
-    case 2: //
-    case 5: //fullscreen
+    case 2: // normal
+    case 5: // fullscreen
         w->wl.visible = GLFW_TRUE;
         w->wl.maximized = GLFW_TRUE;
         break;
-    case 3: //in pause
+    case 3: // paused/minimized
         w->wl.visible = GLFW_FALSE;
         w->wl.maximized = GLFW_FALSE;
         break;
     }
+
+    // Call iconify callback if state changed
+    GLFWbool isIconified = !w->wl.visible;
+    if (isIconified != wasIconified)
+        _glfwInputWindowIconify(w, isIconified);
 }
 
 void qtExtendedSurfaceSetGenericProperty(void *data,
@@ -3347,7 +3354,7 @@ static void lockPointer(_GLFWwindow* window)
     if (!_glfw.wl.relativePointerManager)
     {
         _glfwInputError(GLFW_FEATURE_UNAVAILABLE,
-                        "Wayland: The compositor does not zwp_relative_pointer_manager_v1");
+                        "Wayland: The compositor does not support zwp_relative_pointer_manager_v1");
     } else  {
         window->wl.relativePointer =
             zwp_relative_pointer_manager_v1_get_relative_pointer(
