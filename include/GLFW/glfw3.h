@@ -343,6 +343,17 @@ extern "C" {
  *  @ingroup input
  */
 #define GLFW_REPEAT                 2
+/*! @brief The touch sequence was cancelled by the compositor.
+ *
+ *  The touch sequence was cancelled by the compositor, typically because
+ *  it took the sequence over for a system gesture.  The affected touch
+ *  points die without a `GLFW_RELEASE` event and no further events will
+ *  be delivered for them.
+ *
+ *  @ingroup input
+ *  @since Added in version 3.4-aurora
+ */
+#define GLFW_TOUCH_CANCEL           3
 /*! @} */
 
 /*! @defgroup hat_state Joystick hat states
@@ -2035,7 +2046,12 @@ typedef void (* GLFWjoystickfun)(int jid, int event);
  *
  *  @param[in] window The window that received the event.
  *  @param[in] touch The touch point index.
- *  @param[in] action `GLFW_PRESS`, `GLFW_RELEASE`, or `GLFW_REPEAT`
+ *  @param[in] action `GLFW_PRESS`, `GLFW_RELEASE`, `GLFW_REPEAT` or
+ *  `GLFW_TOUCH_CANCEL`.  `GLFW_TOUCH_CANCEL` means the compositor has
+ *  cancelled the touch sequence (typically for a system gesture): the
+ *  touch point dies without a `GLFW_RELEASE` event and no further events
+ *  will be delivered for it.  One cancel event is delivered per active
+ *  touch point.
  *  @param[in] x The x-coordinate of the touch point.
  *  @param[in] y The y-coordinate of the touch point.
  *

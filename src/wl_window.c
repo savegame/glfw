@@ -2248,13 +2248,15 @@ static void touchHandleFrame(void* userData,
 static void touchHandleCancel(void* userData,
                               struct wl_touch* touch)
 {
-    // Cancel all active touches
+    // Cancel all active touches: report the cancellation instead of a
+    // regular release.  Buffered motion is not flushed — a cancel aborts
+    // the sequence, it does not complete it.
     for (int i = 0; i < GLFW_WL_TOUCH_MAX; i++)
     {
         _GLFWtouchPointWayland* tp = &_glfw.wl.touchPoints[i];
         if (tp->active)
         {
-            _glfwInputTouch(tp->window, i, GLFW_RELEASE, tp->x, tp->y);
+            _glfwInputTouch(tp->window, i, GLFW_TOUCH_CANCEL, tp->x, tp->y);
             freeTouchPoint(i);
         }
     }
