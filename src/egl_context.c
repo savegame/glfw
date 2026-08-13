@@ -282,7 +282,31 @@ static void swapBuffersEGL(_GLFWwindow* window)
     {
         // NOTE: Swapping buffers on a hidden window on Wayland makes it visible
         if (!window->wl.visible)
+        {
+            // While hidden (e.g. iconified by the compositor via
+            // qt_extended_surface.onscreen_visibility on Aurora OS),
+            // eglSwapBuffers() below is never called, so this window stops
+            // receiving wl_surface.frame callbacks - the only thing that
+            // normally throttles the application's main loop to the
+            // compositor's refresh rate. Without a substitute wait here the
+            // caller's render loop would spin at 100% CPU for as long as
+            // the window stays hidden.
+            //
+            // Emulate a ~60Hz frame callback by waiting on the Wayland
+            // display's fd with a ~16ms timeout, reusing the same
+            // _glfwPollPOSIX() helper the Wayland event loop
+            // (handleEvents() in wl_window.c) already uses to wait for
+            // display activity. This only waits for the fd to become
+            // readable (or for the timeout to elapse) - it does not read or
+            // dispatch any Wayland events itself, so it cannot race or
+            // duplicate the dispatching glfwPollEvents()/glfwWaitEvents()
+            // already do. If the compositor sends anything (e.g. the
+            // visibility-restoring event) the wait returns immediately.
+            struct pollfd fd = { wl_display_get_fd(_glfw.wl.display), POLLIN };
+            double timeout = 0.016; // ~1 frame at 60Hz
+            _glfwPollPOSIX(&fd, 1, &timeout);
             return;
+        }
     }
 #endif
 
