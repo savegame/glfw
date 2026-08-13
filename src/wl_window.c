@@ -681,7 +681,10 @@ static void wlShellSurfaceConfigure(void *data,
             _glfwInputWindowDamage(window);
     }
 
-    if (!window->wl.visible)
+    // Don't let a configure event re-map a window that the compositor has
+    // told us (via qt_extended_surface.onscreen_visibility) is iconified;
+    // otherwise swaps would resume with no frame callback to throttle them.
+    if (!window->wl.visible && !window->wl.iconified)
     {
         window->wl.visible = GLFW_TRUE;
         _glfwInputWindowDamage(window);
@@ -706,25 +709,30 @@ void qtExtendedSurfaceOnScreenVisibility(void *data,
                             int32_t visible)
 {
     _GLFWwindow* w = (_GLFWwindow*)data;
-    GLFWbool wasIconified = !w->wl.visible;
+    GLFWbool wasIconified = w->wl.iconified;
 
     switch(visible)
     {
     case 2: // normal
     case 5: // fullscreen
         w->wl.visible = GLFW_TRUE;
-        w->wl.maximized = GLFW_TRUE;
+        w->wl.iconified = GLFW_FALSE;
         break;
     case 3: // paused/minimized
         w->wl.visible = GLFW_FALSE;
-        w->wl.maximized = GLFW_FALSE;
+        w->wl.iconified = GLFW_TRUE;
         break;
     }
 
-    // Call iconify callback if state changed
-    GLFWbool isIconified = !w->wl.visible;
-    if (isIconified != wasIconified)
-        _glfwInputWindowIconify(w, isIconified);
+    // Call iconify callback if the iconified state changed. This is
+    // deliberately based on wl.iconified, not wl.visible: "visible" only
+    // tracks whether the surface is mapped (it also drives the EGL swap
+    // guard below), while "iconified" is the actual minimized/paused state
+    // reported by the qt_extended_surface protocol. Conflating the two used
+    // to also stomp wl.maximized on every visibility change, which is
+    // unrelated to iconification.
+    if (w->wl.iconified != wasIconified)
+        _glfwInputWindowIconify(w, w->wl.iconified);
 }
 
 void qtExtendedSurfaceSetGenericProperty(void *data,
@@ -1152,7 +1160,9 @@ static GLFWbool createWlShellObjects(_GLFWwindow* window)
     wl_surface_commit(window->wl.surface);
     wl_display_roundtrip(_glfw.wl.display);
 
-    if (!window->wl.visible)
+    // See wlShellSurfaceConfigure(): don't re-map a window that is known to
+    // be iconified.
+    if (!window->wl.visible && !window->wl.iconified)
     {
         window->wl.visible = GLFW_TRUE;
         _glfwInputWindowDamage(window);
@@ -2942,9 +2952,12 @@ GLFWbool _glfwWindowFocusedWayland(_GLFWwindow* window)
 
 GLFWbool _glfwWindowIconifiedWayland(_GLFWwindow* window)
 {
-    // xdg-shell doesn’t give any way to request whether a surface is
-    // iconified.
-    return GLFW_FALSE;
+    // xdg-shell doesn't give any way to request whether a surface is
+    // iconified. On compositors that advertise the Qt qt_extended_surface
+    // protocol (e.g. Aurora OS/lipstick), wl.iconified is kept up to date
+    // by qtExtendedSurfaceOnScreenVisibility(); on any other compositor it
+    // stays GLFW_FALSE.
+    return window->wl.iconified;
 }
 
 GLFWbool _glfwWindowVisibleWayland(_GLFWwindow* window)
